@@ -1,0 +1,121 @@
+---
+title: "Upper Cook Inlet EEZ"
+author: "Adam Reimer"
+date: "2022-11-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+#percent of fish in fed and state waters using groundfish stat areas from logbook program
+logbook_ground <- 
+  readxl::read_excel(".\\Copy of Miller - SC Salmon harvest by federal or state water EEZ (only salmon stat areas) 2004 - 2022.xlsx",
+                     col_types = c("numeric", rep("text", 2), rep("numeric", 7)),
+                     skip = 6) %>%
+  filter(!is.na(Year) & SWHSa != "NULL" & fedorstatea != "NULL") %>%   
+  #Note there are some fedorstate = NULL in later years (wo associated SWHSa = NULL). Line above deletes.
+  mutate_all(function(x){ifelse(is.na(x), 0, x)}) #Note there are some H = NULL in the later years. This line changes to 0.
+
+pct_ground <- 
+  logbook_ground %>%
+  mutate(king = KingLKept + KingSKept) %>%
+  group_by(Year, fedorstatea) %>%
+  summarise_if(is.numeric, sum) %>%
+  select(year = Year, jurisdiction = fedorstatea, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
+  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, king, coho, sock)) %>%
+  mutate(pct_boats_ground = boats_Fed / (boats_Fed + boats_State),
+         pct_king_ground = king_Fed / (king_Fed + king_State),
+         pct_coho_ground = coho_Fed / (coho_Fed + coho_State),
+         pct_sock_ground = sock_Fed / (sock_Fed + sock_State)) %>%
+  select(year, starts_with("pct")) %>%
+  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)_.*", values_to = "pct_ground")
+
+pct_groundP <- 
+  logbook_ground %>%
+  filter(SWHSa %in% c("PN", "P")) %>%
+  mutate(king = KingLKept + KingSKept) %>%
+  group_by(Year, fedorstatea) %>%
+  summarise_if(is.numeric, sum) %>%
+  select(year = Year, jurisdiction = fedorstatea, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
+  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, king, coho, sock)) %>%
+  mutate(pct_boats_ground = boats_Fed / (boats_Fed + boats_State),
+         pct_king_ground = king_Fed / (king_Fed + king_State),
+         pct_coho_ground = coho_Fed / (coho_Fed + coho_State),
+         pct_sock_ground = sock_Fed / (sock_Fed + sock_State)) %>%
+  select(year, starts_with("pct")) %>%
+  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)_.*", values_to = "pct_groundP")
+
+#percent of fish in fed and state waters using salmon stat areas from logbook program
+logbook_salmon <- 
+  readxl::read_excel(".\\Copy of Miller - SC Salmon harvest by federal or state water EEZ (only salmon stat areas) 2004 - 2022.xlsx",
+                     sheet = "Kayla - Area P",
+                     col_types = c("numeric", rep("text", 2), rep("numeric", 7)),
+                     skip = 7) %>%
+  filter(!is.na(Year))
+
+pct_salmonP <- 
+  logbook_salmon %>%
+  mutate(king = KingLKept + KingSKept) %>%
+  group_by(Year, fedorstatea) %>%
+  summarise_if(is.numeric, sum) %>%
+  select(year = Year, jurisdiction = fedorstatea, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
+  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, king, coho, sock)) %>%
+  mutate(pct_boats_ground = boats_Fed / (boats_Fed + boats_State),
+         pct_king_ground = king_Fed / (king_Fed + king_State),
+         pct_coho_ground = coho_Fed / (coho_Fed + coho_State),
+         pct_sock_ground = sock_Fed / (sock_Fed + sock_State)) %>%
+  select(year, starts_with("pct")) %>%
+  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)_.*", values_to = "pct_salmonP")
+
+pct_fed <- 
+  left_join(pct_ground, pct_groundP, by = c("year", "stat")) %>%
+  left_join(pct_salmonP, by = c("year", "stat"))
+
+pct_fed %>%
+  select(-starts_with(c("fed", "state"))) %>%
+  pivot_longer(starts_with("pct"), names_to = "grouping", values_to = "pct") %>%
+  ggplot(aes(x = year, y = pct, color = grouping)) +
+    geom_line() +
+  facet_grid(.~stat)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure}
+swhs_r <- readxl::read_excel(".\\Copy of UCI_Salmon_20221107.xlsx", 
+                           sheet = "sw_res",
+                           col_types = "numeric",
+                           skip = 4)
+swhs_n <- readxl::read_excel(".\\Copy of UCI_Salmon_20221107.xlsx", 
+                           sheet = "sw_non",
+                           col_types = "numeric",
+                           skip = 4)
+swhs <- 
+  bind_rows(swhs_r, swhs_n) %>%
+  group_by(YEAR) %>%
+  summarise_all(.funs = sum) %>%
+  select(year = YEAR, king = har_chinook, coho = har_coho, sock = har_sockeye) %>%
+  pivot_longer(king:sock, names_to = "spp", values_to = "H")
+```
+
+```{r pressure}
+H_fed <- 
+  pct_fed %>%
+    filter(stat != "boats") %>%
+    rename(spp = stat) %>%
+    right_join(swhs, pct_fed, by = c("year", "spp")) %>%
+    mutate(fed_ground = H * pct_ground,
+           fed_groundP = H * pct_groundP,
+           fed_salmonP = H * pct_salmonP,) %>%
+    select(year, spp, H, starts_with("fed")) 
+
+H_fed %>%
+  pivot_longer(starts_with("fed"), names_to = "area", names_pattern = ".*_(.*)", values_to = "H") %>%
+  ggplot(aes(x = year, y = H, color = area)) +
+    geom_line() +
+  facet_grid(.~spp)
+```
