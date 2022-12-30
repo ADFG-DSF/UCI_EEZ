@@ -1,121 +1,222 @@
 ---
-title: "Upper Cook Inlet EEZ"
+title: "Upper Cook Inlet Exclusive Economic Zone Harvest"
 author: "Adam Reimer"
-date: "2022-11-18"
+date: "2022-12-29"
 output: html_document
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.cap = TRUE, fig.align = 'center')
 library(tidyverse)
-#percent of fish in fed and state waters using groundfish stat areas from logbook program
-logbook_ground <- 
+```
+# UCI EEZ Harvest Estimates
+## Methods
+The Division of Sport Fish conducts the mail-based Statewide Harvest Survey (SWHS) to estimate sport fishing annual effort (angler-days), harvest (fish kept), and total catch (fish kept plus fish released). Effort, harvest, and catch estimates are available by geographic area, but are not specifically available for the EEZ. The closest available geographic area is Upper Cook Inlet salt waters (marine waters in Cook Inlet North of a line between Bluff Point and Chinitna Point), which shares a southern boundary with the Upper Cook Inlet EEZ but contains both State and Federal waters in Upper Cook Inlet. Harvest and catch estimates are available for species commonly targeted by sport anglers and are available stratified into categories such as boat/shore and charter/non-charter.
+
+In addition, all saltwater sport fishing guide operators are required to maintain an ADF&G-issued logbook of their clients’ catch.  The Division of Sport Fish conducts a program to issue Saltwater Charter Logbooks, which provides a census of effort, harvest, and catch for guided anglers.  Charter captains record the statistical area where the majority of their sport effort, catch and harvest occurred. Separate areas are recorded for groundfish fishing and for salmon fishing. Prior to 2015 groundfish statistical areas were used to document geographic area for both salmon and groundfish fishing, while salmon statistical areas were used for salmon fishing beginning in 2015. Groundfish areas delineate state and federal waters well with respect to distance form shore, but include marine waters in both Upper and Lower Cook Inlet. Salmon statistical areas delineate Upper and Lower Cook Inlet well but span both federal and state waters with respect to distance from shore.  Therefore, while logbook data can be used to provide a rough estimate of the proportion of the guided harvest that occurred in the EEZ for each species and year it is not a clear distinction and any inherit bias may vary before and after 2014. 
+  
+Groundfish statistical areas 526030, 526003, 516001, 526002, 516002, 525932, 525931, 515938, 515939, 515937, and 515936 were considered part of Upper Cook Inlet (defined as set $UCI^G$ below) while areas 526002, 516002, 525932, 525931, 515938 were considered Federal waters (defined as set $UCI^{Gfed}$ below) The estimate of the annual proportion of harvest occurred in in the UCI EEZ for years prior to 2015 $p^G_{y}$ is:
+
+\begin{equation}
+p^G_{y}~=~\frac{\sum_g^{\in UCI^G_{fed}} L_{yg}}{\sum_g^{\in UCI^G} L_{yg}}
+\end{equation}
+
+where $L_{yg}$ is the reported harvest by charter operators in year $y$ and in statistical areas $g$.
+
+Salmon statistical areas 221000, 221010, 221020, 221030, 221040, 221050, 221060, 221070, and 221080 were considered part of Upper Cook Inlet (defined as set $UCI^S$ below) while areas 221000, and 221030 were considered Federal waters (defined as set $UCI^{Sfed}$ below).  The estimate of the annual proportion of harvest occurred in in the UCI EEZ for years 2015 and later p^S_{y} is:
+
+\begin{equation}
+p^S_{y}~=~\frac{\sum_s^{\in UCI^S_{fed}} L_{ys}}{\sum_s^{\in UCI^S} L_{ys}}
+\end{equation}
+
+where $L_{ys}$ is the reported harvest by charter operators in year $y$ and in statistical areas $s$.
+```{r, fig.cap = "Figure 1.- Proportion of Charter logbook harvest reported in federal waters, 2004-2021."}
+img1_path <- ".\\Map2_GroundFish_Salmon.png"
+knitr::include_graphics(img1_path)
+```
+
+Herein we use the product of estimates of the proportion of salmon harvest that occur in federal waters in the Upper Cook Inlet EEZ from the Charter logbook program ($p^G_{y}$ or $p^S_{y}$) and SWHS estimates for king, coho and sockeye salmon harvest from boats in Upper Cook Inlet each year since 2004 $S^{boat}_y$ to estiamte harvest with the Upper Cook Inlet EEZ. Thus, UCI harvest estimates within the EEZ are:
+
+\begin{equation}
+H^{federal}_{y}~=~p^X_{y}*S^{boat}_y
+\end{equation}
+
+where $p^X_{y}$ is $p^G_{y}$ prior to 2015 and $p^S_{y}$ thereafter.
+
+UCI harvest estimates in state waters are:
+
+\begin{equation}
+H^{state}_{y}~=~(1 - p^X_{y})*S^{boat}_y+S^{shore}_y
+\end{equation}
+
+This approach assumes that guided and unguided fisheries have equal proportions of harvest in federal waters.  
+
+## Results
+
+```{r, include = FALSE}
+library(tidyverse)
+###   percent of fish in fed and state waters using groundfish stat areas from logbook program   ###
+
+pct_P <- 
   readxl::read_excel(".\\Copy of Miller - SC Salmon harvest by federal or state water EEZ (only salmon stat areas) 2004 - 2022.xlsx",
                      col_types = c("numeric", rep("text", 2), rep("numeric", 7)),
                      skip = 6) %>%
   filter(!is.na(Year) & SWHSa != "NULL" & fedorstatea != "NULL") %>%   
   #Note there are some fedorstate = NULL in later years (wo associated SWHSa = NULL). Line above deletes.
-  mutate_all(function(x){ifelse(is.na(x), 0, x)}) #Note there are some H = NULL in the later years. This line changes to 0.
-
-pct_ground <- 
-  logbook_ground %>%
-  mutate(king = KingLKept + KingSKept) %>%
-  group_by(Year, fedorstatea) %>%
-  summarise_if(is.numeric, sum) %>%
-  select(year = Year, jurisdiction = fedorstatea, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
-  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, king, coho, sock)) %>%
-  mutate(pct_boats_ground = boats_Fed / (boats_Fed + boats_State),
-         pct_king_ground = king_Fed / (king_Fed + king_State),
-         pct_coho_ground = coho_Fed / (coho_Fed + coho_State),
-         pct_sock_ground = sock_Fed / (sock_Fed + sock_State)) %>%
-  select(year, starts_with("pct")) %>%
-  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)_.*", values_to = "pct_ground")
-
-pct_groundP <- 
-  logbook_ground %>%
   filter(SWHSa %in% c("PN", "P")) %>%
+  mutate_all(function(x){ifelse(is.na(x), 0, x)}) %>% #Note there are some H = NULL in the later years. This line changes to 0.
   mutate(king = KingLKept + KingSKept) %>%
   group_by(Year, fedorstatea) %>%
   summarise_if(is.numeric, sum) %>%
-  select(year = Year, jurisdiction = fedorstatea, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
-  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, king, coho, sock)) %>%
-  mutate(pct_boats_ground = boats_Fed / (boats_Fed + boats_State),
-         pct_king_ground = king_Fed / (king_Fed + king_State),
-         pct_coho_ground = coho_Fed / (coho_Fed + coho_State),
-         pct_sock_ground = sock_Fed / (sock_Fed + sock_State)) %>%
+  select(year = Year, jurisdiction = fedorstatea, trips = Trips, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
+  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, trips, king, coho, sock)) %>%
+  mutate(pct_trips = trips_Fed / (trips_Fed + trips_State), 
+         #pct_boats = boats_Fed / (boats_Fed + boats_State), #trips seem like a better metric of effort
+         pct_king = king_Fed / (king_Fed + king_State),
+         pct_coho = coho_Fed / (coho_Fed + coho_State),
+         pct_sockeye = sock_Fed / (sock_Fed + sock_State)) %>%
   select(year, starts_with("pct")) %>%
-  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)_.*", values_to = "pct_groundP")
+  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)", values_to = "pct_P")
 
-#percent of fish in fed and state waters using salmon stat areas from logbook program
-logbook_salmon <- 
-  readxl::read_excel(".\\Copy of Miller - SC Salmon harvest by federal or state water EEZ (only salmon stat areas) 2004 - 2022.xlsx",
+###   percent of fish in fed and state waters using salmon stat areas from logbook program   ###
+pct_UCI <- 
+  readxl::read_excel(".\\SC salmon harvest by federal or state waters EEZ 2004 - 2022.xlsx",
                      sheet = "Kayla - Area P",
                      col_types = c("numeric", rep("text", 2), rep("numeric", 7)),
                      skip = 7) %>%
-  filter(!is.na(Year))
-
-pct_salmonP <- 
-  logbook_salmon %>%
+  filter(!is.na(Year)) %>%
   mutate(king = KingLKept + KingSKept) %>%
   group_by(Year, fedorstatea) %>%
   summarise_if(is.numeric, sum) %>%
-  select(year = Year, jurisdiction = fedorstatea, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
-  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, king, coho, sock)) %>%
-  mutate(pct_boats_ground = boats_Fed / (boats_Fed + boats_State),
-         pct_king_ground = king_Fed / (king_Fed + king_State),
-         pct_coho_ground = coho_Fed / (coho_Fed + coho_State),
-         pct_sock_ground = sock_Fed / (sock_Fed + sock_State)) %>%
+  select(year = Year, jurisdiction = fedorstatea, trips = Trips, boats = Vesselsb, king, coho = CohoKept, sock = SockKept) %>%
+  pivot_wider(year, names_from = "jurisdiction", values_from = c(boats, trips, king, coho, sock)) %>%
+  mutate(pct_trips = trips_Fed / (trips_Fed + trips_State),
+         #pct_boats = boats_Fed / (boats_Fed + boats_State),
+         pct_king = king_Fed / (king_Fed + king_State),
+         pct_coho = coho_Fed / (coho_Fed + coho_State),
+         pct_sockeye = sock_Fed / (sock_Fed + sock_State)) %>%
   select(year, starts_with("pct")) %>%
-  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)_.*", values_to = "pct_salmonP")
+  pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)", values_to = "pct_UCI")
 
+###   Combine both estimates of percent of harvest in EEZ ###
 pct_fed <- 
-  left_join(pct_ground, pct_groundP, by = c("year", "stat")) %>%
-  left_join(pct_salmonP, by = c("year", "stat"))
+  left_join(pct_P, pct_UCI, by = c("year", "stat")) %>%
+  filter(year != 2022)
+```
 
+The change to salmon statistical areas appears to have had a significant impact on our estimate of the proportion of harvest within federal waters for charter logbook data. After salmon statistical areas were implemented in 2015 the percentage of boats attributed to federal waters fell markedly as did the percentage of harvest for coho, king and sockeye salmon. 
+
+```{r, fig.height = 5, fig.width = 10, fig.cap = "Figure 2.- Proportion of Charter logbook trips and harvest reported in federal waters, 2004-2021."}
+pct_fed %>%
+  select(-starts_with(c("fed", "state"))) %>%
+  pivot_longer(starts_with("pct"), names_to = "grouping", values_to = "pct") %>%
+  filter(grouping == "pct_UCI") %>%
+  ggplot(aes(x = year, y = pct)) +
+    geom_line() +
+    geom_vline(xintercept = 2015, linetype = 2) +
+    scale_y_continuous(name = "Proportion") +
+    facet_grid(.~stat)
+```
+
+
+```{r}
+read_SWHS <- function(year, file = ".\\Boat_shore_salmon_harvest.20221221.xlsx"){
+    readxl::read_excel(file, 
+                     sheet = year,
+                     col_types = c("text", rep("numeric", 15)),
+                     skip = 3, 
+                     na = ".") %>%
+  filter(Area %in% c("K", "L")) %>%
+  select(boat_king = boat_ks, boat_coho = boat_ss, boat_sockeye = boat_rs, shore_king = shore_ks, shore_coho = shore_ss, shore_sockeye = shore_rs) %>%
+  mutate(year = as.numeric(year)) %>%
+  group_by(year) %>%
+  summarise_all(.funs = sum, na.rm = TRUE) %>%
+  pivot_longer(-year, names_to = c("location", "spp"), names_pattern = "(.*)_(.*)", values_to = "H_KL") 
+}
+swhs_KL <- 
+  lapply(as.character(2004:2021), read_SWHS) %>% 
+  do.call(rbind, .)
+
+swhs_P <- 
+  readxl::read_excel(".\\UCI_salmon_boatshore_20221222.xlsx", 
+                     sheet = "uci_harvest",
+                     col_types = c("numeric", rep("text", 3), rep("numeric", 6)),
+                     skip = 2) %>%
+  select(year = YEAR, location = AnglerType, king = KS, coho = SS, sockeye = RS) %>%
+  group_by(year, location) %>%
+  summarise_all(.funs = sum) %>%
+  pivot_longer(king:sockeye, names_to = "spp", values_to = "H_P") %>%
+  mutate(location = tolower(location))
+```
+Table: Table 1.- Estimated Harvest within the Upper Cook Inlet EEZ, 2004--2021.
+```{r}
+pct_fed_merge <- 
+  pct_fed %>%
+    filter(stat != "boats") %>%
+    rename(spp = stat) 
+
+H_UCI <- 
+  swhs_KL %>%
+  right_join(swhs_P, pct_fed, by = c("year", "spp", "location")) %>%
+  right_join(pct_fed_merge, by = c("year", "spp")) %>%
+    mutate(fed_P = ifelse(location == "boat", H_P * pct_P, 0),
+           state_P = ifelse(location == "boat", H_P * (1 - pct_P) + H_KL, H_P + H_KL),
+           fed_UCI = ifelse(location == "boat", H_P * pct_UCI, 0),
+           state_UCI = ifelse(location == "boat", H_P * (1 - pct_UCI) + H_KL, H_P + H_KL)) %>%
+   group_by(year, spp) %>%
+   summarise(pct_P = mean(pct_P), 
+             pct_UCI = mean(pct_UCI),
+             fed_P = sum(fed_P),
+             state_P = sum(state_P),
+             fed_UCI = sum(fed_UCI),
+             state_UCI = sum(state_UCI)) 
+
+# Verified this matches Hazzy's output
+# H_UCI %>%
+#   select(year, spp, fed_P) %>%
+#   pivot_wider(year, names_from = "spp", values_from = "fed_P")
+
+H_UCI %>%
+  select(-starts_with("pct")) %>%
+  pivot_longer(fed_P:state_UCI, names_to = c("area", "prop"), names_pattern = "(.*)_(.*)", values_to = "H") %>%
+  filter(prop == "UCI" & area == "fed") %>%
+  select(-area, -prop) %>%
+  pivot_wider(names_from = spp, values_from = H) %>%
+  knitr::kable(digits = 0)
+```
+
+## Comparison to previous estimates
+Previous estimates or salmon harvest in the Upper Cook Inlet EEZ used the same methodology but used charter logbook data from a larger geographic area. Figure 3 shows the statistical areas and the categorization as federal and state waters used in previous estimates. 
+```{r, fig.cap = "Figure 3.- Proportion of Charter logbook harvest reported in federal waters, 2004-2021."}
+img1_path <- ".\\Map1_GroundFish_Salmon.png"
+knitr::include_graphics(img1_path)
+```
+
+Estimates of the percentage of effort and harvest in federal waters follow the same general trend when all of Cook Inlet is used to generate the estimates.
+
+```{r, fig.height = 5, fig.width = 10, fig.cap = "Figure 4.- Proportion of Charter logbook harvest reported in federal waters, 2004-2021."}
 pct_fed %>%
   select(-starts_with(c("fed", "state"))) %>%
   pivot_longer(starts_with("pct"), names_to = "grouping", values_to = "pct") %>%
   ggplot(aes(x = year, y = pct, color = grouping)) +
     geom_line() +
-  facet_grid(.~stat)
+    geom_vline(xintercept = 2015, linetype = 2) +
+    scale_color_discrete(name = "Logbook area", labels = c("Cook Inlet", "Upper Cook Inlet")) +
+    scale_y_continuous(name = "Proportion") +
+    facet_grid(.~stat)
 
 ```
 
-## Including Plots
+I have verified that the pink line below match Hazzy's numbers.
 
-You can also embed plots, for example:
-
-```{r pressure}
-swhs_r <- readxl::read_excel(".\\Copy of UCI_Salmon_20221107.xlsx", 
-                           sheet = "sw_res",
-                           col_types = "numeric",
-                           skip = 4)
-swhs_n <- readxl::read_excel(".\\Copy of UCI_Salmon_20221107.xlsx", 
-                           sheet = "sw_non",
-                           col_types = "numeric",
-                           skip = 4)
-swhs <- 
-  bind_rows(swhs_r, swhs_n) %>%
-  group_by(YEAR) %>%
-  summarise_all(.funs = sum) %>%
-  select(year = YEAR, king = har_chinook, coho = har_coho, sock = har_sockeye) %>%
-  pivot_longer(king:sock, names_to = "spp", values_to = "H")
-```
-
-```{r pressure}
-H_fed <- 
-  pct_fed %>%
-    filter(stat != "boats") %>%
-    rename(spp = stat) %>%
-    right_join(swhs, pct_fed, by = c("year", "spp")) %>%
-    mutate(fed_ground = H * pct_ground,
-           fed_groundP = H * pct_groundP,
-           fed_salmonP = H * pct_salmonP,) %>%
-    select(year, spp, H, starts_with("fed")) 
-
-H_fed %>%
-  pivot_longer(starts_with("fed"), names_to = "area", names_pattern = ".*_(.*)", values_to = "H") %>%
-  ggplot(aes(x = year, y = H, color = area)) +
+```{r, fig.height = 5, fig.width = 10, fig.cap = "Figure 5.- Proportion of Charter logbook harvest reported in federal waters, 2004-2021."}
+H_UCI %>%
+  select(-starts_with("pct")) %>%
+  pivot_longer(fed_P:state_UCI, names_to = c("area", "prop"), names_pattern = "(.*)_(.*)", values_to = "H") %>%
+  filter(area == "fed", spp != "trips") %>%
+  ggplot(aes(x = year, y = H, color = prop)) +
     geom_line() +
-  facet_grid(.~spp)
+    geom_vline(xintercept = 2015, linetype = 2) +
+    scale_color_discrete(name = "Logbook area", labels = c("Cook Inlet", "Upper Cook Inlet")) +
+    scale_y_continuous(name = "Harvest") +
+    facet_grid(spp~., scales = "free_y")
 ```
