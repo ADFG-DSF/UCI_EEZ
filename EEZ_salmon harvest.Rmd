@@ -1,0 +1,183 @@
+---
+title: "Upper Cook Inlet Exclusive Economic Zone Harvest"
+author: "Adam Reimer"
+date: "2023-1-23"
+output: html_document
+---
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.cap = TRUE, fig.align = 'center')
+library(tidyverse)
+###   Fish in salmon stat areas North of Anchor Point from logbook program   ###
+H_logbook0 <- 
+  readxl::read_excel(".\\Reimer Salmon Harvest in stat areas between 221000 and 223050 Ran 1_26_2023.xlsx",
+                     col_types = c("numeric", "text", rep("numeric", 5)),
+                     col_names = c("year", "area", "kingL", "kingS", "coho", "sockeye", "other"),
+                     skip = 6) %>%
+  filter(!is.na(year), area %in% c("221000", "221010", "221020", "221030", "221040", "221050", "221060", "221070", "221080"))
+
+H_logbook <- 
+  H_logbook0 %>%
+  filter(area %in% c("221030", "221040", "221050", "221060", "221070", "221080")) %>%
+  mutate(king = kingL + kingS) %>%
+  select(-kingL, -kingS, -other) %>%
+  pivot_longer(coho:king, names_to = "spp", values_to = "H_logbook")
+
+###  Estimates/assumptions of proportion fed for each stat area  ###
+###   Fish in salmon stat areas North of Anchor Point from logbook program   ###
+p_nearshore <- 
+  readxl::read_excel(".\\Reimer Cook Inlet Inshore Salmon Area Harvest 2005_2014 Ran 1_24_2023.xlsx",
+                     col_types = c("numeric", "text", rep("numeric", 5)),
+                     col_names = c("year", "area", "kingL", "kingS", "coho", "sockeye", "other"),
+                     skip = 6) %>%
+  filter(year != 2005) %>%
+  mutate(king = kingL + kingS,
+         areaname = ifelse(area == "515938", "offshore", "nearshore")) %>%
+  select(-kingL, -kingS, -other) %>%
+  pivot_longer(coho:king, names_to = "spp", values_to = "H_nearshore") %>%
+  pivot_wider(id_cols = c("year", "spp"), names_from = "areaname", values_from = "H_nearshore") %>%
+  mutate(theta = offshore/(offshore + nearshore))
+
+swhs_p <- 
+  readxl::read_excel(".\\UCI_salmon_boatshore_20221222.xlsx", 
+                     sheet = "uci_harvest",
+                     col_types = c("numeric", rep("text", 3), rep("numeric", 6)),
+                     skip = 2) %>%
+  filter(AnglerType == "Boat" & YEAR >= 2015) %>%
+  mutate(chartertype = ifelse(CharterType == "Non-charter", "Non_charter", CharterType)) %>%
+  select(year = YEAR, chartertype, king = KS, coho = SS, sockeye = RS) %>%
+  pivot_longer(king:sockeye, names_to = "spp", values_to = "H_SWHS") %>%
+  pivot_wider(id_cols = c("year", "spp"), names_from = chartertype, values_from = H_SWHS) %>%
+  mutate(p_charter = Charter / (Charter + Non_charter))
+```
+# Upper Cook Inlet Exclusive Economic Zone (UCI EEZ) Harvest Estimates
+## Available Data
+The Division of Sport Fish conducts a Saltwater Charter Logbook program which requires all saltwater sport fishing guide operators to maintain an ADF&G-issued logbook and report effort, harvest, and catch for guided anglers. Charter captains record the statistical area where the majority of their sport effort, catch and harvest occurred. Separate areas are recorded for groundfish fishing and for salmon fishing. Prior to 2015 groundfish statistical areas were used to document geographic area for both salmon and groundfish fishing, while salmon statistical areas were used for salmon fishing beginning in 2015. Groundfish areas delineate state and federal waters well with respect to distance form shore, but there is no statistical are which uses the EEZ defined boundary for the southern extent of Upper Cook Inlet. Salmon statistical areas delineate the EEZ defined boundary for the southern extent of Upper Cook Inlet well but span both federal and state waters with respect to distance from shore.  Therefore, while logbook data can be used to provide a rough estimate of guided harvest that occurred in the UCIt EEZ for each species and year, correction factors are needed and any bias introduced by the correction factors will differ before and after 2014. In this analysis we use reported harvest prior to 2015 to estimate the proportion of fish harvested within 3 miles of shore and use reported harvest in 2015 and later to estimate the magnitude of harvest within the UCI EEZ.
+
+```{r, fig.cap = "Figure 1.- Charter Logbook statistical areas used for reporting salmon effort, 2004-2021."}
+img1_path <- ".\\CookInlet_BottomFishEZZ.png"
+knitr::include_graphics(img1_path)
+```
+  
+In addition, the Division of Sport Fish conducts the mail-based Statewide Harvest Survey (SWHS) to estimate sport fishing annual effort (angler-days), harvest (fish kept), and total catch (fish kept plus fish released). Harvest and catch estimates are available for species commonly targeted by sport anglers and are available stratified into geographic areas and categories such as boat/shore and charter/non-charter. Unfortunately, none of the geographic areas used in the SWHS match the boundaries of the EEZ. The closest available geographic area is marine waters in Cook Inlet North of a line between Bluff Point and Chinitna Point, which is South of the southern boundary with the UCI EEZ. Significant harvest occurs in marine waters between Bluff Point and Anchor Point. SWHS estimates also include both State and Federal waters with respect to distance from shore. In addition, the SWHS has issues estimating catch, harvest and effort from fisheries with poorly defined geographic boundaries. Area biologists feel these issues affect SWHS from Upper Cook Inlet, particularity for coho and sockeye salmon. In this analysis, SWHS estimates were only used to derive the fraction of the total harvest taken by Charter anglers.
+
+```{r, fig.width = 9, fig.cap = "Figure 2.- Reported charter harvest from Guide Logbooks and estimated charter harvest from the SWHS, Upper Cook Inlet, 2015-2021."}
+H_logbookbluff <- 
+  H_logbook0 %>%
+  mutate(king = kingL + kingS) %>%
+  select(-kingL, -kingS, -other) %>%
+  pivot_longer(coho:king, names_to = "spp", values_to = "H_logbook") %>%
+  group_by(year, spp) %>%
+  summarise(Logbook_Bluff = sum(H_logbook), .groups = "drop")
+
+H_logbookanchor <- 
+  H_logbook %>%
+  group_by(year, spp) %>%
+  summarise(Logbook_Anchor = sum(H_logbook), .groups = "drop")
+
+swhs_p %>%
+  select(year, spp, SWHS_Bluff = Charter) %>%
+  left_join(H_logbookanchor, by = c("year", "spp")) %>%
+  left_join(H_logbookbluff, by = c("year", "spp")) %>%
+  pivot_longer(SWHS_Bluff:Logbook_Bluff, names_to = "source", values_to = "H") %>%
+  ggplot(aes(x = year, y = H, color = source)) +
+    geom_line() +
+    facet_grid(. ~ spp) +
+    xlab("Year") +
+    ylab("Charter Harvest") +
+    scale_color_discrete(name = "Harvest Source_Southern Boundary")
+```
+
+## Methods
+  
+Salmon statistical areas 221030, 221040, 221050, 221060, 221070, and 221080 are part of the UCI EEZ. For this analysis area 221030 was considered 100% Federal waters. While areas 221050 and 221070 were 100% within state waters and areas 221040, 221060 and 221080 overlapped the boundary between state and federal waters we combined harvest from all 5 statistical areas when apportioning harvest. Annual charter harvest in in the UCI EEZ for species $s$ during years $y$ ($H_{Csy}$) was estimated as:
+
+\begin{equation}
+H_{Csy}~=~L_{221030sy} + \theta_s(L_{221040sy} + L_{221050sy} + L_{221060sy} + L_{221070sy} + L_{221080sy})
+\end{equation}
+
+where $L_{asy}$ is the reported harvest by charter operators in statistical areas $a$ for species $s$ and year $y$, and $\theta_s$ is an estimate of charter harvest greater than 3 nautical miles from shore. Our estimate of $\theta_s$ came from the average of the annual ratio of Charter Logbook reported harvest in groundfish statistical areas 515938 and 515939 between 2006 and 2014:
+
+\begin{equation}
+\theta_s~=~\sum_y{\frac{L_{515938sy}}{L_{515938sy} + L_{515939sy}}}
+\end{equation}
+
+Figure 1 shows that groundfish statistical areas 515938 and 515939 heavily overlap salmon statistical areas 221040, 221050, 221060 and 221070 providing a reasonable proxy for the distribution of harvest with respect to distance from shore for each species. This approach assumes that guided and unguided fisheries have equal proportions of harvest in federal waters.
+
+```{r, fig.cap = "Figure 2.- Percent of harvest reported greater than 3 miles from shore as a fraction of the total reported harvest in groundfish statistical area 515938 and 515939 by species and year, 2006-2014. The mean percentage for each species is shown as a dotted line and was used in the analysis."}
+mean_pnearshore <-
+  p_nearshore %>%
+  group_by(spp) %>%
+  summarise(theta = mean(theta, na.rm = TRUE))
+
+p_nearshore %>%
+  ggplot(aes(x = year, y = theta, color = spp)) +
+    geom_line() +
+    geom_hline(aes(yintercept = theta, color = spp), data = mean_pnearshore, linetype = 2) +
+    xlab("Year") +
+    ylab("\u03B8") +
+    scale_color_discrete(name = "Species")
+```
+
+Annual harvest in in the UCI EEZ for years 2015 and later ($H_{sy}$) was estimated as:
+
+\begin{equation}
+H_{sy}~=~\frac{H_{Csy}}{\phi_{sy}}
+\end{equation}
+
+where $\phi_{sy}$ is the ratio of charter harvest from boats and total harvest from boats from the SWHS for species $s$ in year $y$. Statewide harvest survey estimates for 2022 are not available at this time and the mean ratio from 2015-2021 was used in proxy.
+
+```{r, fig.cap = "Figure 3.- Percent of SWHS estimated harvest in salt waters North of Bluff Point attributed to Charter anglers by species and year, 2015-2021. The mean percentage for each species is shown as a dotted line and was used in the analysis for the 2022 season."}
+mean_swhsp <- swhs_p %>% group_by(spp) %>% summarise(mean_pcharter = mean(p_charter))
+
+# Spot check for phi
+swhs_p %>%
+  ggplot(aes(x = year, y = p_charter, color = spp)) +
+    geom_line() +
+    geom_hline(aes(yintercept = mean_pcharter, color = spp), mean_swhsp, linetype = 2) +
+    xlab("Year") +
+    ylab("\u03C6") +
+    scale_color_discrete(name = "Species")
+```
+
+## Results
+
+```{r, include = FALSE}
+theta <- 
+  expand.grid(area = c("221040", "221050", "221060", "221070", "221080"), spp = c("king", "coho", "sockeye")) %>%
+  left_join(mean_pnearshore, "spp") %>%
+  rbind(expand.grid(area = c("221030"), spp = c("king", "coho", "sockeye"), theta = 1))
+
+###   Charter harvest in EEZ  ###
+H_charter <- 
+  left_join(H_logbook, theta, by = c("area", "spp")) %>%
+  mutate(H_charter = H_logbook * theta) %>%
+  group_by(year, spp) %>%
+  summarise(H_charter = sum(H_charter), .groups = "drop")
+
+# #spot check
+# #We know all of the harvest in 221050 and 221070 in 100% state and should be the largest fisheries (at least for kings)
+# #H_logbook line (which is only 221050 and 221070) should be larger than the H_guided line (which apportioned all harvest east of long 152)
+# H_logbook %>%
+#   filter(area %in% c("221040", "221050", "221060", "221070", "221080")) %>%
+#   mutate(area2 = ifelse(area %in% c("221050", "221070"), "mile", "gt mile")) %>%
+#   group_by(year, spp, area2) %>%
+#   summarise(H_logbook = sum(H_logbook), .groups = "drop") %>%
+#   pivot_wider(id_cols = c("year", "spp"), names_from = "area2", values_from = "H_logbook") %>%
+#   left_join(H_charter, by = c("year", "spp")) %>%
+#   pivot_longer(c(-year, -spp), names_to = "source", values_to = "H") %>%
+#   ggplot(aes(x = year, y = H, color = source)) +
+#     geom_line() +
+#     facet_grid(spp~., scales = "free_y")
+```
+
+
+Table: Table 1.- Estimated Harvest within the Upper Cook Inlet EEZ, 2015--2022.
+```{r}
+H_charter %>%
+  left_join(swhs_p, by = c("year", "spp")) %>%
+  left_join(mean_swhsp, by = "spp") %>%
+  mutate(fill_pcharter = ifelse(is.na(p_charter), mean_pcharter, p_charter),
+         H = round(H_charter / fill_pcharter)) %>%
+ pivot_wider(id_cols = c("year"), names_from = spp, values_from = H) %>%
+  knitr::kable()
+```
