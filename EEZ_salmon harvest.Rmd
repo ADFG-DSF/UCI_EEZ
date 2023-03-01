@@ -2,10 +2,12 @@
 title: "Upper Cook Inlet Exclusive Economic Zone Harvest"
 author: "Adam Reimer"
 date: "2023-1-23"
-output: html_document
+output: 
+  html_document:
+      theme: readable
 ---
 ```{r, include = FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.cap = TRUE, fig.align = 'center')
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.cap = TRUE, fig.align = 'left')
 library(tidyverse)
 ###   Fish in salmon stat areas North of Anchor Point from logbook program   ###
 H_logbook0 <- 
@@ -51,15 +53,16 @@ swhs_p <-
 ```
 # Upper Cook Inlet Exclusive Economic Zone (UCI EEZ) Harvest Estimates
 ## Available Data
-The Division of Sport Fish conducts a Saltwater Charter Logbook program which requires all saltwater sport fishing guide operators to maintain an ADF&G-issued logbook and report effort, harvest, and catch for guided anglers. Charter captains record the statistical area where the majority of their sport effort, catch and harvest occurred. Separate areas are recorded for groundfish fishing and for salmon fishing. Prior to 2015 groundfish statistical areas were used to document geographic area for both salmon and groundfish fishing, while salmon statistical areas were used for salmon fishing beginning in 2015. Groundfish areas delineate state and federal waters well with respect to distance form shore, but there is no statistical are which uses the EEZ defined boundary for the southern extent of Upper Cook Inlet. Salmon statistical areas delineate the EEZ defined boundary for the southern extent of Upper Cook Inlet well but span both federal and state waters with respect to distance from shore.  Therefore, while logbook data can be used to provide a rough estimate of guided harvest that occurred in the UCIt EEZ for each species and year, correction factors are needed and any bias introduced by the correction factors will differ before and after 2014. In this analysis we use reported harvest prior to 2015 to estimate the proportion of fish harvested within 3 miles of shore and use reported harvest in 2015 and later to estimate the magnitude of harvest within the UCI EEZ.
-
+The Division of Sport Fish conducts a Saltwater Charter Logbook program which requires all saltwater sport fishing guide operators to maintain an ADF&G-issued logbook and report effort, harvest, and catch for guided anglers. Charter captains record the statistical area where the majority of their sport effort, catch and harvest occurred. Separate areas are recorded for groundfish fishing and for salmon fishing. Prior to 2015 groundfish statistical areas were used to document geographic area for both salmon and groundfish fishing, while salmon statistical areas were used for salmon fishing beginning in 2015. Groundfish areas delineate state and federal waters well with respect to distance form shore, but there is no statistical area which uses the EEZ defined boundary for the southern extent of Upper Cook Inlet. Salmon statistical areas delineate the EEZ defined boundary for the southern extent of Upper Cook Inlet well but span both federal and state waters with respect to distance from shore.  Therefore, while logbook data can be used to provide a rough estimate of guided harvest that occurred in the UCI EEZ for each species and year, correction factors are needed and any bias introduced by the correction factors will differ before and after 2014. In this analysis we use reported harvest prior to 2015 to estimate the proportion of fish harvested within 3 miles of shore and use reported harvest in 2015 and later to estimate the magnitude of harvest within the UCI EEZ.
+  
 ```{r, fig.cap = "Figure 1.- Charter Logbook statistical areas used for reporting salmon effort, 2004-2021."}
 img1_path <- ".\\CookInlet_BottomFishEZZ.png"
 knitr::include_graphics(img1_path)
 ```
-  
-In addition, the Division of Sport Fish conducts the mail-based Statewide Harvest Survey (SWHS) to estimate sport fishing annual effort (angler-days), harvest (fish kept), and total catch (fish kept plus fish released). Harvest and catch estimates are available for species commonly targeted by sport anglers and are available stratified into geographic areas and categories such as boat/shore and charter/non-charter. Unfortunately, none of the geographic areas used in the SWHS match the boundaries of the EEZ. The closest available geographic area is marine waters in Cook Inlet North of a line between Bluff Point and Chinitna Point, which is South of the southern boundary with the UCI EEZ. Significant harvest occurs in marine waters between Bluff Point and Anchor Point. SWHS estimates also include both State and Federal waters with respect to distance from shore. In addition, the SWHS has issues estimating catch, harvest and effort from fisheries with poorly defined geographic boundaries. Area biologists feel these issues affect SWHS from Upper Cook Inlet, particularity for coho and sockeye salmon. In this analysis, SWHS estimates were only used to derive the fraction of the total harvest taken by Charter anglers.
+<br />
 
+In addition, the Division of Sport Fish conducts the mail-based Statewide Harvest Survey (SWHS) to estimate sport fishing annual effort (angler-days), harvest (fish kept), and total catch (fish kept plus fish released). Harvest and catch estimates are available for species commonly targeted by sport anglers and are available stratified into geographic areas and categories such as boat/shore and charter/non-charter. Unfortunately, none of the geographic areas used in the SWHS match the boundaries of the EEZ. The closest available geographic area is marine waters in Cook Inlet North of a line between Bluff Point and Chinitna Point, which is South of the southern boundary with the UCI EEZ. Significant harvest occurs in marine waters between Bluff Point and Anchor Point. SWHS estimates also include both State and Federal waters with respect to distance from shore. In addition, the SWHS has issues estimating catch, harvest and effort from fisheries with poorly defined geographic boundaries. Area biologists feel these issues affect SWHS from Upper Cook Inlet, particularity for coho and sockeye salmon. In this analysis, SWHS estimates were only used to derive the fraction of the total harvest taken by Charter anglers.
+  
 ```{r, fig.width = 9, fig.cap = "Figure 2.- Reported charter harvest from Guide Logbooks and estimated charter harvest from the SWHS, Upper Cook Inlet, 2015-2021."}
 H_logbookbluff <- 
   H_logbook0 %>%
@@ -86,9 +89,9 @@ swhs_p %>%
     ylab("Charter Harvest") +
     scale_color_discrete(name = "Harvest Source_Southern Boundary")
 ```
+<br />
 
 ## Methods
-  
 Salmon statistical areas 221030, 221040, 221050, 221060, 221070, and 221080 are part of the UCI EEZ. For this analysis area 221030 was considered 100% Federal waters. While areas 221050 and 221070 were 100% within state waters and areas 221040, 221060 and 221080 overlapped the boundary between state and federal waters we combined harvest from all 5 statistical areas when apportioning harvest. Annual charter harvest in in the UCI EEZ for species $s$ during years $y$ ($H_{Csy}$) was estimated as:
 
 \begin{equation}
@@ -102,7 +105,7 @@ where $L_{asy}$ is the reported harvest by charter operators in statistical area
 \end{equation}
 
 Figure 1 shows that groundfish statistical areas 515938 and 515939 heavily overlap salmon statistical areas 221040, 221050, 221060 and 221070 providing a reasonable proxy for the distribution of harvest with respect to distance from shore for each species. This approach assumes that guided and unguided fisheries have equal proportions of harvest in federal waters.
-
+  
 ```{r, fig.cap = "Figure 2.- Percent of harvest reported greater than 3 miles from shore as a fraction of the total reported harvest in groundfish statistical area 515938 and 515939 by species and year, 2006-2014. The mean percentage for each species is shown as a dotted line and was used in the analysis."}
 mean_pnearshore <-
   p_nearshore %>%
@@ -117,6 +120,7 @@ p_nearshore %>%
     ylab("\u03B8") +
     scale_color_discrete(name = "Species")
 ```
+<br />
 
 Annual harvest in in the UCI EEZ for years 2015 and later ($H_{sy}$) was estimated as:
 
@@ -138,6 +142,7 @@ swhs_p %>%
     ylab("\u03C6") +
     scale_color_discrete(name = "Species")
 ```
+<br />
 
 ## Results
 
@@ -169,8 +174,7 @@ H_charter <-
 #     geom_line() +
 #     facet_grid(spp~., scales = "free_y")
 ```
-
-
+  
 Table: Table 1.- Estimated Harvest within the Upper Cook Inlet EEZ, 2015--2022.
 ```{r}
 H_charter %>%
