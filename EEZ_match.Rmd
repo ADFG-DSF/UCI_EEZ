@@ -34,7 +34,7 @@ img1_path <- ".\\Map2_GroundFish_Salmon.png"
 knitr::include_graphics(img1_path)
 ```
 
-Herein we use the product of estimates of the proportion of salmon harvest that occur in federal waters in the Upper Cook Inlet EEZ from the Charter logbook program ($p^G_{y}$ or $p^S_{y}$) and SWHS estimates for king, coho and sockeye salmon harvest from boats in Upper Cook Inlet each year since 2004 $S^{boat}_y$ to estiamte harvest with the Upper Cook Inlet EEZ. Thus, UCI harvest estimates within the EEZ are:
+Herein we use the product of estimates of the proportion of salmon harvest that occur in federal waters in the Upper Cook Inlet EEZ from the Charter logbook program ($p^G_{y}$ or $p^S_{y}$) and SWHS estimates for king, coho and sockeye salmon harvest from boats in Upper Cook Inlet each year since 2004 $S^{boat}_y$ to estimate harvest with the Upper Cook Inlet EEZ. Thus, UCI harvest estimates within the EEZ are:
 
 \begin{equation}
 H^{federal}_{y}~=~p^X_{y}*S^{boat}_y
@@ -56,6 +56,7 @@ This approach assumes that guided and unguided fisheries have equal proportions 
 library(tidyverse)
 ###   percent of fish in fed and state waters using groundfish stat areas from logbook program   ###
 
+#Uses fish captured in all of area P to estimate EEZ percentage 
 pct_P <- 
   readxl::read_excel(".\\Copy of Miller - SC Salmon harvest by federal or state water EEZ (only salmon stat areas) 2004 - 2022.xlsx",
                      col_types = c("numeric", rep("text", 2), rep("numeric", 7)),
@@ -77,7 +78,7 @@ pct_P <-
   select(year, starts_with("pct")) %>%
   pivot_longer(starts_with("pct"), names_to = "stat", names_pattern = ".*_(.*)", values_to = "pct_P")
 
-###   percent of fish in fed and state waters using salmon stat areas from logbook program   ###
+#Uses fish captured in UCI to estimate EEZ percentage
 pct_UCI <- 
   readxl::read_excel(".\\SC salmon harvest by federal or state waters EEZ 2004 - 2022.xlsx",
                      sheet = "Kayla - Area P",
@@ -132,10 +133,13 @@ read_SWHS <- function(year, file = ".\\Boat_shore_salmon_harvest.20221221.xlsx")
   summarise_all(.funs = sum, na.rm = TRUE) %>%
   pivot_longer(-year, names_to = c("location", "spp"), names_pattern = "(.*)_(.*)", values_to = "H_KL") 
 }
+
+#SWHS estimates for areas K and L
 swhs_KL <- 
   lapply(as.character(2004:2021), read_SWHS) %>% 
   do.call(rbind, .)
 
+# SWHS estiamtes from area P
 swhs_P <- 
   readxl::read_excel(".\\UCI_salmon_boatshore_20221222.xlsx", 
                      sheet = "uci_harvest",
@@ -158,9 +162,9 @@ H_UCI <-
   swhs_KL %>%
   right_join(swhs_P, pct_fed, by = c("year", "spp", "location")) %>%
   right_join(pct_fed_merge, by = c("year", "spp")) %>%
-    mutate(fed_P = ifelse(location == "boat", H_P * pct_P, 0),
+    mutate(fed_P = ifelse(location == "boat", H_P * pct_P, 0), # _P represent Hazzy's prior calculations
            state_P = ifelse(location == "boat", H_P * (1 - pct_P) + H_KL, H_P + H_KL),
-           fed_UCI = ifelse(location == "boat", H_P * pct_UCI, 0),
+           fed_UCI = ifelse(location == "boat", H_P * pct_UCI, 0), # _UCI represent similar calculations using only UCI stat areas
            state_UCI = ifelse(location == "boat", H_P * (1 - pct_UCI) + H_KL, H_P + H_KL)) %>%
    group_by(year, spp) %>%
    summarise(pct_P = mean(pct_P), 
